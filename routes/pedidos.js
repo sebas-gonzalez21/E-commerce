@@ -12,7 +12,6 @@ pedidosIniciales.forEach(p => {
     [p.id, p.usuario_id, p.total, p.estado]);
 });
 
-// GET - filtro dinámico con Object.entries()
 router.get('/', (req, res) => {
   const condiciones = [];
   const valores = [];
@@ -39,7 +38,6 @@ router.get('/:id', (req, res) => {
   });
 });
 
-// POST con validaciones
 router.post('/', (req, res) => {
   const { usuario_id, total, estado } = req.body;
 
@@ -54,7 +52,6 @@ router.post('/', (req, res) => {
   if (estado && !estadosValidos.includes(estado))
     return res.status(400).json({ error: `El estado debe ser uno de: ${estadosValidos.join(', ')}` });
 
-  // Verificar que el usuario (FK) existe
   db.get('SELECT id FROM usuarios WHERE id = ?', [usuario_id], (err, existe) => {
     if (err) return res.status(500).json({ error: err.message });
     if (!existe) return res.status(400).json({ error: `No existe un usuario con id ${usuario_id}` });
@@ -67,7 +64,6 @@ router.post('/', (req, res) => {
   });
 });
 
-// PUT con validaciones
 router.put('/:id', (req, res) => {
   const { usuario_id, total, estado } = req.body;
 
@@ -82,12 +78,10 @@ router.put('/:id', (req, res) => {
   if (!estadosValidos.includes(estado))
     return res.status(400).json({ error: `El estado debe ser uno de: ${estadosValidos.join(', ')}` });
 
-  // Verificar que el pedido existe
   db.get('SELECT id FROM pedidos WHERE id = ?', [req.params.id], (err, existe) => {
     if (err) return res.status(500).json({ error: err.message });
     if (!existe) return res.status(404).json({ error: 'Pedido no encontrado' });
 
-    // Verificar que el usuario (FK) existe
     db.get('SELECT id FROM usuarios WHERE id = ?', [usuario_id], (err, user) => {
       if (err) return res.status(500).json({ error: err.message });
       if (!user) return res.status(400).json({ error: `No existe un usuario con id ${usuario_id}` });

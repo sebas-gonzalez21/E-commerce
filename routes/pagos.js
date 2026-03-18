@@ -12,7 +12,6 @@ pagosIniciales.forEach(p => {
     [p.id, p.pedido_id, p.metodo, p.estado]);
 });
 
-// GET - filtro dinámico con Object.entries()
 router.get('/', (req, res) => {
   const condiciones = [];
   const valores = [];
@@ -35,7 +34,6 @@ router.get('/:id', (req, res) => {
   });
 });
 
-// POST con validaciones
 router.post('/', (req, res) => {
   const { pedido_id, metodo, estado } = req.body;
 
@@ -54,7 +52,6 @@ router.post('/', (req, res) => {
   if (estado && !estadosValidos.includes(estado))
     return res.status(400).json({ error: `El estado debe ser uno de: ${estadosValidos.join(', ')}` });
 
-  // Verificar FK pedido
   db.get('SELECT id FROM pedidos WHERE id = ?', [pedido_id], (err, pedido) => {
     if (err) return res.status(500).json({ error: err.message });
     if (!pedido) return res.status(400).json({ error: `No existe un pedido con id ${pedido_id}` });
@@ -67,7 +64,6 @@ router.post('/', (req, res) => {
   });
 });
 
-// PUT con validaciones
 router.put('/:id', (req, res) => {
   const { pedido_id, metodo, estado } = req.body;
 
@@ -84,12 +80,10 @@ router.put('/:id', (req, res) => {
   if (!estadosValidos.includes(estado))
     return res.status(400).json({ error: `El estado debe ser uno de: ${estadosValidos.join(', ')}` });
 
-  // Verificar que el pago existe
   db.get('SELECT id FROM pagos WHERE id = ?', [req.params.id], (err, existe) => {
     if (err) return res.status(500).json({ error: err.message });
     if (!existe) return res.status(404).json({ error: 'Pago no encontrado' });
 
-    // Verificar FK pedido
     db.get('SELECT id FROM pedidos WHERE id = ?', [pedido_id], (err, pedido) => {
       if (err) return res.status(500).json({ error: err.message });
       if (!pedido) return res.status(400).json({ error: `No existe un pedido con id ${pedido_id}` });

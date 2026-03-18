@@ -15,7 +15,6 @@ productosIniciales.forEach(p => {
     [p.id, p.nombre, p.precio, p.stock, p.categoria_id]);
 });
 
-// GET - filtro dinámico con Object.entries()
 router.get('/', (req, res) => {
   const condiciones = [];
   const valores = [];
@@ -42,7 +41,6 @@ router.get('/:id', (req, res) => {
   });
 });
 
-// POST con validaciones
 router.post('/', (req, res) => {
   const { nombre, precio, stock, categoria_id } = req.body;
 
@@ -55,7 +53,6 @@ router.post('/', (req, res) => {
   if (isNaN(stock) || stock < 0)
     return res.status(400).json({ error: 'El stock debe ser un número válido mayor o igual a 0' });
 
-  // Verificar que la categoría (FK) existe
   db.get('SELECT id FROM categorias WHERE id = ?', [categoria_id], (err, existe) => {
     if (err) return res.status(500).json({ error: err.message });
     if (!existe) return res.status(400).json({ error: `No existe una categoría con id ${categoria_id}` });
@@ -68,7 +65,6 @@ router.post('/', (req, res) => {
   });
 });
 
-// PUT con validaciones
 router.put('/:id', (req, res) => {
   const { nombre, precio, stock, categoria_id } = req.body;
 
@@ -81,12 +77,10 @@ router.put('/:id', (req, res) => {
   if (isNaN(stock) || stock < 0)
     return res.status(400).json({ error: 'El stock debe ser un número válido mayor o igual a 0' });
 
-  // Verificar que el producto existe
   db.get('SELECT id FROM productos WHERE id = ?', [req.params.id], (err, existe) => {
     if (err) return res.status(500).json({ error: err.message });
     if (!existe) return res.status(404).json({ error: 'Producto no encontrado' });
 
-    // Verificar que la categoría (FK) existe
     db.get('SELECT id FROM categorias WHERE id = ?', [categoria_id], (err, cat) => {
       if (err) return res.status(500).json({ error: err.message });
       if (!cat) return res.status(400).json({ error: `No existe una categoría con id ${categoria_id}` });

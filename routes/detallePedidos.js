@@ -13,7 +13,6 @@ detallesIniciales.forEach(d => {
     [d.id, d.pedido_id, d.producto_id, d.cantidad, d.precio_unitario]);
 });
 
-// GET - filtro dinámico con Object.entries()
 router.get('/', (req, res) => {
   const condiciones = [];
   const valores = [];
@@ -38,7 +37,6 @@ router.get('/:id', (req, res) => {
   });
 });
 
-// POST con validaciones
 router.post('/', (req, res) => {
   const { pedido_id, producto_id, cantidad, precio_unitario } = req.body;
 
@@ -53,12 +51,10 @@ router.post('/', (req, res) => {
   if (isNaN(precio_unitario) || precio_unitario < 0)
     return res.status(400).json({ error: 'El precio_unitario debe ser un número válido mayor o igual a 0' });
 
-  // Verificar FK pedido
   db.get('SELECT id FROM pedidos WHERE id = ?', [pedido_id], (err, pedido) => {
     if (err) return res.status(500).json({ error: err.message });
     if (!pedido) return res.status(400).json({ error: `No existe un pedido con id ${pedido_id}` });
 
-    // Verificar FK producto
     db.get('SELECT id FROM productos WHERE id = ?', [producto_id], (err, producto) => {
       if (err) return res.status(500).json({ error: err.message });
       if (!producto) return res.status(400).json({ error: `No existe un producto con id ${producto_id}` });
@@ -72,7 +68,6 @@ router.post('/', (req, res) => {
   });
 });
 
-// PUT con validaciones
 router.put('/:id', (req, res) => {
   const { pedido_id, producto_id, cantidad, precio_unitario } = req.body;
 
@@ -83,17 +78,14 @@ router.put('/:id', (req, res) => {
   if (isNaN(precio_unitario) || precio_unitario < 0)
     return res.status(400).json({ error: 'El precio_unitario debe ser un número válido mayor o igual a 0' });
 
-  // Verificar que el detalle existe
   db.get('SELECT id FROM detallePedidos WHERE id = ?', [req.params.id], (err, existe) => {
     if (err) return res.status(500).json({ error: err.message });
     if (!existe) return res.status(404).json({ error: 'Detalle de pedido no encontrado' });
 
-    // Verificar FK pedido
     db.get('SELECT id FROM pedidos WHERE id = ?', [pedido_id], (err, pedido) => {
       if (err) return res.status(500).json({ error: err.message });
       if (!pedido) return res.status(400).json({ error: `No existe un pedido con id ${pedido_id}` });
 
-      // Verificar FK producto
       db.get('SELECT id FROM productos WHERE id = ?', [producto_id], (err, producto) => {
         if (err) return res.status(500).json({ error: err.message });
         if (!producto) return res.status(400).json({ error: `No existe un producto con id ${producto_id}` });

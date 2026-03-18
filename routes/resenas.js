@@ -13,7 +13,6 @@ resenasIniciales.forEach(r => {
     [r.id, r.usuario_id, r.producto_id, r.calificacion, r.comentario]);
 });
 
-// GET - filtro dinámico con Object.entries()
 router.get('/', (req, res) => {
   const condiciones = [];
   const valores = [];
@@ -40,7 +39,6 @@ router.get('/:id', (req, res) => {
   });
 });
 
-// POST con validaciones
 router.post('/', (req, res) => {
   const { usuario_id, producto_id, calificacion, comentario } = req.body;
 
@@ -55,12 +53,10 @@ router.post('/', (req, res) => {
   if (typeof comentario !== 'string' || comentario.trim() === '')
     return res.status(400).json({ error: 'El comentario debe ser un texto válido' });
 
-  // Verificar FK usuario
   db.get('SELECT id FROM usuarios WHERE id = ?', [usuario_id], (err, usuario) => {
     if (err) return res.status(500).json({ error: err.message });
     if (!usuario) return res.status(400).json({ error: `No existe un usuario con id ${usuario_id}` });
 
-    // Verificar FK producto
     db.get('SELECT id FROM productos WHERE id = ?', [producto_id], (err, producto) => {
       if (err) return res.status(500).json({ error: err.message });
       if (!producto) return res.status(400).json({ error: `No existe un producto con id ${producto_id}` });
@@ -74,7 +70,6 @@ router.post('/', (req, res) => {
   });
 });
 
-// PUT con validaciones
 router.put('/:id', (req, res) => {
   const { usuario_id, producto_id, calificacion, comentario } = req.body;
 
@@ -85,17 +80,14 @@ router.put('/:id', (req, res) => {
   if (typeof comentario !== 'string' || comentario.trim() === '')
     return res.status(400).json({ error: 'El comentario debe ser un texto válido' });
 
-  // Verificar que la reseña existe
   db.get('SELECT id FROM resenas WHERE id = ?', [req.params.id], (err, existe) => {
     if (err) return res.status(500).json({ error: err.message });
     if (!existe) return res.status(404).json({ error: 'Reseña no encontrada' });
 
-    // Verificar FK usuario
     db.get('SELECT id FROM usuarios WHERE id = ?', [usuario_id], (err, usuario) => {
       if (err) return res.status(500).json({ error: err.message });
       if (!usuario) return res.status(400).json({ error: `No existe un usuario con id ${usuario_id}` });
 
-      // Verificar FK producto
       db.get('SELECT id FROM productos WHERE id = ?', [producto_id], (err, producto) => {
         if (err) return res.status(500).json({ error: err.message });
         if (!producto) return res.status(400).json({ error: `No existe un producto con id ${producto_id}` });

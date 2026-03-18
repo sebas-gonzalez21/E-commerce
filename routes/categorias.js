@@ -11,7 +11,6 @@ categoriasIniciales.forEach(c => {
   db.run(`INSERT OR IGNORE INTO categorias (id, nombre) VALUES (?, ?)`, [c.id, c.nombre]);
 });
 
-// GET - filtro dinámico con Object.entries()
 router.get('/', (req, res) => {
   const condiciones = [];
   const valores = [];
@@ -34,7 +33,6 @@ router.get('/:id', (req, res) => {
   });
 });
 
-// POST con validaciones
 router.post('/', (req, res) => {
   const { nombre } = req.body;
 
@@ -43,7 +41,6 @@ router.post('/', (req, res) => {
   if (typeof nombre !== 'string' || nombre.trim() === '')
     return res.status(400).json({ error: 'El nombre debe ser un texto válido' });
 
-  // Unicidad del nombre
   db.get('SELECT id FROM categorias WHERE nombre = ?', [nombre.trim()], (err, existe) => {
     if (err) return res.status(500).json({ error: err.message });
     if (existe) return res.status(400).json({ error: 'Ya existe una categoría con ese nombre' });
@@ -55,7 +52,6 @@ router.post('/', (req, res) => {
   });
 });
 
-// PUT con validaciones
 router.put('/:id', (req, res) => {
   const { nombre } = req.body;
 
@@ -64,12 +60,10 @@ router.put('/:id', (req, res) => {
   if (typeof nombre !== 'string' || nombre.trim() === '')
     return res.status(400).json({ error: 'El nombre debe ser un texto válido' });
 
-  // Verificar que la categoría existe
   db.get('SELECT id FROM categorias WHERE id = ?', [req.params.id], (err, existe) => {
     if (err) return res.status(500).json({ error: err.message });
     if (!existe) return res.status(404).json({ error: 'Categoría no encontrada' });
 
-    // Unicidad excluyendo el mismo registro
     db.get('SELECT id FROM categorias WHERE nombre = ? AND id != ?', [nombre.trim(), req.params.id], (err, duplicado) => {
       if (err) return res.status(500).json({ error: err.message });
       if (duplicado) return res.status(400).json({ error: 'Ya existe otra categoría con ese nombre' });

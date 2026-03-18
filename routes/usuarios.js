@@ -12,7 +12,6 @@ usuariosIniciales.forEach(u => {
     [u.id, u.nombre, u.email, u.password]);
 });
 
-// GET - filtro dinámico con Object.entries()
 router.get('/', (req, res) => {
   const condiciones = [];
   const valores = [];
@@ -35,7 +34,6 @@ router.get('/:id', (req, res) => {
   });
 });
 
-// POST con validaciones
 router.post('/', (req, res) => {
   const { nombre, email, password } = req.body;
 
@@ -48,7 +46,6 @@ router.post('/', (req, res) => {
   if (typeof password !== 'string' || password.trim() === '')
     return res.status(400).json({ error: 'El password debe ser un texto válido' });
 
-  // Unicidad del email
   db.get('SELECT id FROM usuarios WHERE email = ?', [email], (err, existe) => {
     if (err) return res.status(500).json({ error: err.message });
     if (existe) return res.status(400).json({ error: 'Ya existe un usuario con ese email' });
@@ -61,7 +58,6 @@ router.post('/', (req, res) => {
   });
 });
 
-// PUT con validaciones
 router.put('/:id', (req, res) => {
   const { nombre, email, password } = req.body;
 
@@ -72,12 +68,10 @@ router.put('/:id', (req, res) => {
   if (typeof email !== 'string' || email.trim() === '')
     return res.status(400).json({ error: 'El email debe ser un texto válido' });
 
-  // Verificar que el usuario existe
   db.get('SELECT id FROM usuarios WHERE id = ?', [req.params.id], (err, existe) => {
     if (err) return res.status(500).json({ error: err.message });
     if (!existe) return res.status(404).json({ error: 'Usuario no encontrado' });
 
-    // Unicidad del email excluyendo el mismo registro
     db.get('SELECT id FROM usuarios WHERE email = ? AND id != ?', [email, req.params.id], (err, duplicado) => {
       if (err) return res.status(500).json({ error: err.message });
       if (duplicado) return res.status(400).json({ error: 'Ya existe otro usuario con ese email' });
