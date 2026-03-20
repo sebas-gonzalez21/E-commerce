@@ -11,8 +11,8 @@ const productosIniciales = [
   { id: 6, nombre: 'Lámpara de Escritorio', precio: 62000,  stock: 60,  categoria_id: 3 },
 ];
 productosIniciales.forEach(p => {
-  db.run(`INSERT OR IGNORE INTO productos (id, nombre, precio, stock, categoria_id) VALUES (?, ?, ?, ?, ?)`,
-    [p.id, p.nombre, p.precio, p.stock, p.categoria_id]);
+  db.prepare(`INSERT OR IGNORE INTO productos (id, nombre, precio, stock, categoria_id) VALUES (?, ?, ?, ?, ?)`)
+    .run(p.id, p.nombre, p.precio, p.stock, p.categoria_id);
 });
 
 router.get('/', (req, res) => {
@@ -23,27 +23,25 @@ router.get('/', (req, res) => {
     valores.push(`%${valor}%`);
   });
   const where = condiciones.length > 0 ? `WHERE ${condiciones.join(' AND ')}` : '';
-  db.all(`SELECT productos.*, categorias.nombre AS categoria 
-          FROM productos LEFT JOIN categorias ON productos.categoria_id = categorias.id
-          ${where}`, valores, (err, rows) => {
-    if (err) return res.status(500).json({ error: err.message });
+  try {
+    const rows = db.prepare(`SELECT productos.*, categorias.nombre AS categoria 
+      FROM productos LEFT JOIN categorias ON productos.categoria_id = categorias.id ${where}`).all(valores);
     res.json(rows);
-  });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 router.get('/:id', (req, res) => {
-  db.get(`SELECT productos.*, categorias.nombre AS categoria 
-          FROM productos LEFT JOIN categorias ON productos.categoria_id = categorias.id
-          WHERE productos.id = ?`, [req.params.id], (err, row) => {
-    if (err) return res.status(500).json({ error: err.message });
+  try {
+    const row = db.prepare(`SELECT productos.*, categorias.nombre AS categoria 
+      FROM productos LEFT JOIN categorias ON productos.categoria_id = categorias.id
+      WHERE productos.id = ?`).get(req.params.id);
     if (!row) return res.status(404).json({ error: 'No encontrado' });
     res.json(row);
-  });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 router.post('/', (req, res) => {
   const { nombre, precio, stock, categoria_id } = req.body;
-
   if (!nombre || precio === undefined || stock === undefined || !categoria_id)
     return res.status(400).json({ error: 'Los campos nombre, precio, stock y categoria_id son obligatorios' });
   if (typeof nombre !== 'string' || nombre.trim() === '')
@@ -52,53 +50,39 @@ router.post('/', (req, res) => {
     return res.status(400).json({ error: 'El precio debe ser un número válido mayor o igual a 0' });
   if (isNaN(stock) || stock < 0)
     return res.status(400).json({ error: 'El stock debe ser un número válido mayor o igual a 0' });
-
-  db.get('SELECT id FROM categorias WHERE id = ?', [categoria_id], (err, existe) => {
-    if (err) return res.status(500).json({ error: err.message });
+  try {
+    const existe = db.prepare('SELECT id FROM categorias WHERE id = ?').get(categoria_id);
     if (!existe) return res.status(400).json({ error: `No existe una categoría con id ${categoria_id}` });
-
-    db.run('INSERT INTO productos (nombre, precio, stock, categoria_id) VALUES (?, ?, ?, ?)',
-      [nombre.trim(), precio, stock, categoria_id], function(err) {
-        if (err) return res.status(500).json({ error: err.message });
-        res.status(201).json({ id: this.lastID, nombre, precio, stock, categoria_id });
-      });
-  });
+    const result = db.prepare('INSERT INTO productos (nombre, precio, stock, categoria_id) VALUES (?, ?, ?, ?)')
+      .run(nombre.trim(), precio, stock, categoria_id);
+    res.status(201).json({ id: result.lastInsertRowid, nombre, precio, stock, categoria_id });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 router.put('/:id', (req, res) => {
   const { nombre, precio, stock, categoria_id } = req.body;
-
   if (!nombre || precio === undefined || stock === undefined || !categoria_id)
     return res.status(400).json({ error: 'Los campos nombre, precio, stock y categoria_id son obligatorios' });
-  if (typeof nombre !== 'string' || nombre.trim() === '')
-    return res.status(400).json({ error: 'El nombre debe ser un texto válido' });
   if (isNaN(precio) || precio < 0)
     return res.status(400).json({ error: 'El precio debe ser un número válido mayor o igual a 0' });
   if (isNaN(stock) || stock < 0)
     return res.status(400).json({ error: 'El stock debe ser un número válido mayor o igual a 0' });
-
-  db.get('SELECT id FROM productos WHERE id = ?', [req.params.id], (err, existe) => {
-    if (err) return res.status(500).json({ error: err.message });
+  try {
+    const existe = db.prepare('SELECT id FROM productos WHERE id = ?').get(req.params.id);
     if (!existe) return res.status(404).json({ error: 'Producto no encontrado' });
-
-    db.get('SELECT id FROM categorias WHERE id = ?', [categoria_id], (err, cat) => {
-      if (err) return res.status(500).json({ error: err.message });
-      if (!cat) return res.status(400).json({ error: `No existe una categoría con id ${categoria_id}` });
-
-      db.run('UPDATE productos SET nombre = ?, precio = ?, stock = ?, categoria_id = ? WHERE id = ?',
-        [nombre.trim(), precio, stock, categoria_id, req.params.id], function(err) {
-          if (err) return res.status(500).json({ error: err.message });
-          res.json({ actualizado: this.changes > 0 });
-        });
-    });
-  });
+    const cat = db.prepare('SELECT id FROM categorias WHERE id = ?').get(categoria_id);
+    if (!cat) return res.status(400).json({ error: `No existe una categoría con id ${categoria_id}` });
+    const result = db.prepare('UPDATE productos SET nombre = ?, precio = ?, stock = ?, categoria_id = ? WHERE id = ?')
+      .run(nombre.trim(), precio, stock, categoria_id, req.params.id);
+    res.json({ actualizado: result.changes > 0 });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 router.delete('/:id', (req, res) => {
-  db.run('DELETE FROM productos WHERE id = ?', [req.params.id], function(err) {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json({ eliminado: this.changes > 0 });
-  });
+  try {
+    const result = db.prepare('DELETE FROM productos WHERE id = ?').run(req.params.id);
+    res.json({ eliminado: result.changes > 0 });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-module.exports = router; //productos
+module.exports = router;

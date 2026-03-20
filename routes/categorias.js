@@ -8,7 +8,7 @@ const categoriasIniciales = [
   { id: 3, nombre: 'Hogar y Jardín' },
 ];
 categoriasIniciales.forEach(c => {
-  db.run(`INSERT OR IGNORE INTO categorias (id, nombre) VALUES (?, ?)`, [c.id, c.nombre]);
+  db.prepare(`INSERT OR IGNORE INTO categorias (id, nombre) VALUES (?, ?)`).run(c.id, c.nombre);
 });
 
 router.get('/', (req, res) => {
@@ -19,68 +19,53 @@ router.get('/', (req, res) => {
     valores.push(`%${valor}%`);
   });
   const where = condiciones.length > 0 ? `WHERE ${condiciones.join(' AND ')}` : '';
-  db.all(`SELECT * FROM categorias ${where}`, valores, (err, rows) => {
-    if (err) return res.status(500).json({ error: err.message });
+  try {
+    const rows = db.prepare(`SELECT * FROM categorias ${where}`).all(valores);
     res.json(rows);
-  });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 router.get('/:id', (req, res) => {
-  db.get('SELECT * FROM categorias WHERE id = ?', [req.params.id], (err, row) => {
-    if (err) return res.status(500).json({ error: err.message });
+  try {
+    const row = db.prepare('SELECT * FROM categorias WHERE id = ?').get(req.params.id);
     if (!row) return res.status(404).json({ error: 'No encontrada' });
     res.json(row);
-  });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 router.post('/', (req, res) => {
   const { nombre } = req.body;
-
-  if (!nombre)
-    return res.status(400).json({ error: 'El campo nombre es obligatorio' });
+  if (!nombre) return res.status(400).json({ error: 'El campo nombre es obligatorio' });
   if (typeof nombre !== 'string' || nombre.trim() === '')
     return res.status(400).json({ error: 'El nombre debe ser un texto válido' });
-
-  db.get('SELECT id FROM categorias WHERE nombre = ?', [nombre.trim()], (err, existe) => {
-    if (err) return res.status(500).json({ error: err.message });
+  try {
+    const existe = db.prepare('SELECT id FROM categorias WHERE nombre = ?').get(nombre.trim());
     if (existe) return res.status(400).json({ error: 'Ya existe una categoría con ese nombre' });
-
-    db.run('INSERT INTO categorias (nombre) VALUES (?)', [nombre.trim()], function(err) {
-      if (err) return res.status(500).json({ error: err.message });
-      res.status(201).json({ id: this.lastID, nombre });
-    });
-  });
+    const result = db.prepare('INSERT INTO categorias (nombre) VALUES (?)').run(nombre.trim());
+    res.status(201).json({ id: result.lastInsertRowid, nombre });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 router.put('/:id', (req, res) => {
   const { nombre } = req.body;
-
-  if (!nombre)
-    return res.status(400).json({ error: 'El campo nombre es obligatorio' });
+  if (!nombre) return res.status(400).json({ error: 'El campo nombre es obligatorio' });
   if (typeof nombre !== 'string' || nombre.trim() === '')
     return res.status(400).json({ error: 'El nombre debe ser un texto válido' });
-
-  db.get('SELECT id FROM categorias WHERE id = ?', [req.params.id], (err, existe) => {
-    if (err) return res.status(500).json({ error: err.message });
+  try {
+    const existe = db.prepare('SELECT id FROM categorias WHERE id = ?').get(req.params.id);
     if (!existe) return res.status(404).json({ error: 'Categoría no encontrada' });
-
-    db.get('SELECT id FROM categorias WHERE nombre = ? AND id != ?', [nombre.trim(), req.params.id], (err, duplicado) => {
-      if (err) return res.status(500).json({ error: err.message });
-      if (duplicado) return res.status(400).json({ error: 'Ya existe otra categoría con ese nombre' });
-
-      db.run('UPDATE categorias SET nombre = ? WHERE id = ?', [nombre.trim(), req.params.id], function(err) {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json({ actualizado: this.changes > 0 });
-      });
-    });
-  });
+    const duplicado = db.prepare('SELECT id FROM categorias WHERE nombre = ? AND id != ?').get(nombre.trim(), req.params.id);
+    if (duplicado) return res.status(400).json({ error: 'Ya existe otra categoría con ese nombre' });
+    const result = db.prepare('UPDATE categorias SET nombre = ? WHERE id = ?').run(nombre.trim(), req.params.id);
+    res.json({ actualizado: result.changes > 0 });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 router.delete('/:id', (req, res) => {
-  db.run('DELETE FROM categorias WHERE id = ?', [req.params.id], function(err) {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json({ eliminado: this.changes > 0 });
-  });
+  try {
+    const result = db.prepare('DELETE FROM categorias WHERE id = ?').run(req.params.id);
+    res.json({ eliminado: result.changes > 0 });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-module.exports = router; //categorias
+module.exports = router;

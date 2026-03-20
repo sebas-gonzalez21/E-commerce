@@ -9,8 +9,8 @@ const resenasIniciales = [
   { id: 4, usuario_id: 3, producto_id: 3, calificacion: 5, comentario: 'El smartwatch superó mis expectativas, batería dura bastante.' },
 ];
 resenasIniciales.forEach(r => {
-  db.run(`INSERT OR IGNORE INTO resenas (id, usuario_id, producto_id, calificacion, comentario) VALUES (?, ?, ?, ?, ?)`,
-    [r.id, r.usuario_id, r.producto_id, r.calificacion, r.comentario]);
+  db.prepare(`INSERT OR IGNORE INTO resenas (id, usuario_id, producto_id, calificacion, comentario) VALUES (?, ?, ?, ?, ?)`)
+    .run(r.id, r.usuario_id, r.producto_id, r.calificacion, r.comentario);
 });
 
 router.get('/', (req, res) => {
@@ -21,92 +21,71 @@ router.get('/', (req, res) => {
     valores.push(`%${valor}%`);
   });
   const where = condiciones.length > 0 ? `WHERE ${condiciones.join(' AND ')}` : '';
-  db.all(`SELECT resenas.*, usuarios.nombre AS usuario, productos.nombre AS producto
-          FROM resenas
-          LEFT JOIN usuarios ON resenas.usuario_id = usuarios.id
-          LEFT JOIN productos ON resenas.producto_id = productos.id
-          ${where}`, valores, (err, rows) => {
-    if (err) return res.status(500).json({ error: err.message });
+  try {
+    const rows = db.prepare(`SELECT resenas.*, usuarios.nombre AS usuario, productos.nombre AS producto
+      FROM resenas
+      LEFT JOIN usuarios ON resenas.usuario_id = usuarios.id
+      LEFT JOIN productos ON resenas.producto_id = productos.id
+      ${where}`).all(valores);
     res.json(rows);
-  });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 router.get('/:id', (req, res) => {
-  db.get('SELECT * FROM resenas WHERE id = ?', [req.params.id], (err, row) => {
-    if (err) return res.status(500).json({ error: err.message });
+  try {
+    const row = db.prepare('SELECT * FROM resenas WHERE id = ?').get(req.params.id);
     if (!row) return res.status(404).json({ error: 'No encontrada' });
     res.json(row);
-  });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 router.post('/', (req, res) => {
   const { usuario_id, producto_id, calificacion, comentario } = req.body;
-
   if (!usuario_id || !producto_id || calificacion === undefined || !comentario)
     return res.status(400).json({ error: 'Los campos usuario_id, producto_id, calificacion y comentario son obligatorios' });
-  if (isNaN(usuario_id))
-    return res.status(400).json({ error: 'El usuario_id debe ser un número válido' });
-  if (isNaN(producto_id))
-    return res.status(400).json({ error: 'El producto_id debe ser un número válido' });
+  if (isNaN(usuario_id)) return res.status(400).json({ error: 'El usuario_id debe ser un número válido' });
+  if (isNaN(producto_id)) return res.status(400).json({ error: 'El producto_id debe ser un número válido' });
   if (isNaN(calificacion) || calificacion < 1 || calificacion > 5)
     return res.status(400).json({ error: 'La calificacion debe ser un número entre 1 y 5' });
   if (typeof comentario !== 'string' || comentario.trim() === '')
     return res.status(400).json({ error: 'El comentario debe ser un texto válido' });
-
-  db.get('SELECT id FROM usuarios WHERE id = ?', [usuario_id], (err, usuario) => {
-    if (err) return res.status(500).json({ error: err.message });
+  try {
+    const usuario = db.prepare('SELECT id FROM usuarios WHERE id = ?').get(usuario_id);
     if (!usuario) return res.status(400).json({ error: `No existe un usuario con id ${usuario_id}` });
-
-    db.get('SELECT id FROM productos WHERE id = ?', [producto_id], (err, producto) => {
-      if (err) return res.status(500).json({ error: err.message });
-      if (!producto) return res.status(400).json({ error: `No existe un producto con id ${producto_id}` });
-
-      db.run('INSERT INTO resenas (usuario_id, producto_id, calificacion, comentario) VALUES (?, ?, ?, ?)',
-        [usuario_id, producto_id, calificacion, comentario.trim()], function(err) {
-          if (err) return res.status(500).json({ error: err.message });
-          res.status(201).json({ id: this.lastID, usuario_id, producto_id, calificacion });
-        });
-    });
-  });
+    const producto = db.prepare('SELECT id FROM productos WHERE id = ?').get(producto_id);
+    if (!producto) return res.status(400).json({ error: `No existe un producto con id ${producto_id}` });
+    const result = db.prepare('INSERT INTO resenas (usuario_id, producto_id, calificacion, comentario) VALUES (?, ?, ?, ?)')
+      .run(usuario_id, producto_id, calificacion, comentario.trim());
+    res.status(201).json({ id: result.lastInsertRowid, usuario_id, producto_id, calificacion });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 router.put('/:id', (req, res) => {
   const { usuario_id, producto_id, calificacion, comentario } = req.body;
-
   if (!usuario_id || !producto_id || calificacion === undefined || !comentario)
     return res.status(400).json({ error: 'Los campos usuario_id, producto_id, calificacion y comentario son obligatorios' });
   if (isNaN(calificacion) || calificacion < 1 || calificacion > 5)
     return res.status(400).json({ error: 'La calificacion debe ser un número entre 1 y 5' });
   if (typeof comentario !== 'string' || comentario.trim() === '')
     return res.status(400).json({ error: 'El comentario debe ser un texto válido' });
-
-  db.get('SELECT id FROM resenas WHERE id = ?', [req.params.id], (err, existe) => {
-    if (err) return res.status(500).json({ error: err.message });
+  try {
+    const existe = db.prepare('SELECT id FROM resenas WHERE id = ?').get(req.params.id);
     if (!existe) return res.status(404).json({ error: 'Reseña no encontrada' });
-
-    db.get('SELECT id FROM usuarios WHERE id = ?', [usuario_id], (err, usuario) => {
-      if (err) return res.status(500).json({ error: err.message });
-      if (!usuario) return res.status(400).json({ error: `No existe un usuario con id ${usuario_id}` });
-
-      db.get('SELECT id FROM productos WHERE id = ?', [producto_id], (err, producto) => {
-        if (err) return res.status(500).json({ error: err.message });
-        if (!producto) return res.status(400).json({ error: `No existe un producto con id ${producto_id}` });
-
-        db.run('UPDATE resenas SET usuario_id = ?, producto_id = ?, calificacion = ?, comentario = ? WHERE id = ?',
-          [usuario_id, producto_id, calificacion, comentario.trim(), req.params.id], function(err) {
-            if (err) return res.status(500).json({ error: err.message });
-            res.json({ actualizado: this.changes > 0 });
-          });
-      });
-    });
-  });
+    const usuario = db.prepare('SELECT id FROM usuarios WHERE id = ?').get(usuario_id);
+    if (!usuario) return res.status(400).json({ error: `No existe un usuario con id ${usuario_id}` });
+    const producto = db.prepare('SELECT id FROM productos WHERE id = ?').get(producto_id);
+    if (!producto) return res.status(400).json({ error: `No existe un producto con id ${producto_id}` });
+    const result = db.prepare('UPDATE resenas SET usuario_id = ?, producto_id = ?, calificacion = ?, comentario = ? WHERE id = ?')
+      .run(usuario_id, producto_id, calificacion, comentario.trim(), req.params.id);
+    res.json({ actualizado: result.changes > 0 });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 router.delete('/:id', (req, res) => {
-  db.run('DELETE FROM resenas WHERE id = ?', [req.params.id], function(err) {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json({ eliminado: this.changes > 0 });
-  });
+  try {
+    const result = db.prepare('DELETE FROM resenas WHERE id = ?').run(req.params.id);
+    res.json({ eliminado: result.changes > 0 });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-module.exports = router; //resenas
+module.exports = router;

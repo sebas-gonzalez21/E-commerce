@@ -8,8 +8,8 @@ const pagosIniciales = [
   { id: 3, pedido_id: 3, metodo: 'tarjeta',       estado: 'aprobado'  },
 ];
 pagosIniciales.forEach(p => {
-  db.run(`INSERT OR IGNORE INTO pagos (id, pedido_id, metodo, estado) VALUES (?, ?, ?, ?)`,
-    [p.id, p.pedido_id, p.metodo, p.estado]);
+  db.prepare(`INSERT OR IGNORE INTO pagos (id, pedido_id, metodo, estado) VALUES (?, ?, ?, ?)`)
+    .run(p.id, p.pedido_id, p.metodo, p.estado);
 });
 
 router.get('/', (req, res) => {
@@ -20,88 +20,62 @@ router.get('/', (req, res) => {
     valores.push(`%${valor}%`);
   });
   const where = condiciones.length > 0 ? `WHERE ${condiciones.join(' AND ')}` : '';
-  db.all(`SELECT * FROM pagos ${where}`, valores, (err, rows) => {
-    if (err) return res.status(500).json({ error: err.message });
+  try {
+    const rows = db.prepare(`SELECT * FROM pagos ${where}`).all(valores);
     res.json(rows);
-  });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 router.get('/:id', (req, res) => {
-  db.get('SELECT * FROM pagos WHERE id = ?', [req.params.id], (err, row) => {
-    if (err) return res.status(500).json({ error: err.message });
+  try {
+    const row = db.prepare('SELECT * FROM pagos WHERE id = ?').get(req.params.id);
     if (!row) return res.status(404).json({ error: 'No encontrado' });
     res.json(row);
-  });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 router.post('/', (req, res) => {
   const { pedido_id, metodo, estado } = req.body;
-
-  if (!pedido_id || !metodo)
-    return res.status(400).json({ error: 'Los campos pedido_id y metodo son obligatorios' });
-  if (isNaN(pedido_id))
-    return res.status(400).json({ error: 'El pedido_id debe ser un número válido' });
-  if (typeof metodo !== 'string' || metodo.trim() === '')
-    return res.status(400).json({ error: 'El metodo debe ser un texto válido' });
-
+  if (!pedido_id || !metodo) return res.status(400).json({ error: 'Los campos pedido_id y metodo son obligatorios' });
+  if (isNaN(pedido_id)) return res.status(400).json({ error: 'El pedido_id debe ser un número válido' });
+  if (typeof metodo !== 'string' || metodo.trim() === '') return res.status(400).json({ error: 'El metodo debe ser un texto válido' });
   const metodosValidos = ['tarjeta', 'transferencia', 'efectivo'];
-  if (!metodosValidos.includes(metodo))
-    return res.status(400).json({ error: `El metodo debe ser uno de: ${metodosValidos.join(', ')}` });
-
+  if (!metodosValidos.includes(metodo)) return res.status(400).json({ error: `El metodo debe ser uno de: ${metodosValidos.join(', ')}` });
   const estadosValidos = ['pendiente', 'aprobado', 'fallido'];
-  if (estado && !estadosValidos.includes(estado))
-    return res.status(400).json({ error: `El estado debe ser uno de: ${estadosValidos.join(', ')}` });
-
-  db.get('SELECT id FROM pedidos WHERE id = ?', [pedido_id], (err, pedido) => {
-    if (err) return res.status(500).json({ error: err.message });
+  if (estado && !estadosValidos.includes(estado)) return res.status(400).json({ error: `El estado debe ser uno de: ${estadosValidos.join(', ')}` });
+  try {
+    const pedido = db.prepare('SELECT id FROM pedidos WHERE id = ?').get(pedido_id);
     if (!pedido) return res.status(400).json({ error: `No existe un pedido con id ${pedido_id}` });
-
-    db.run('INSERT INTO pagos (pedido_id, metodo, estado) VALUES (?, ?, ?)',
-      [pedido_id, metodo, estado || 'pendiente'], function(err) {
-        if (err) return res.status(500).json({ error: err.message });
-        res.status(201).json({ id: this.lastID, pedido_id, metodo, estado: estado || 'pendiente' });
-      });
-  });
+    const result = db.prepare('INSERT INTO pagos (pedido_id, metodo, estado) VALUES (?, ?, ?)')
+      .run(pedido_id, metodo, estado || 'pendiente');
+    res.status(201).json({ id: result.lastInsertRowid, pedido_id, metodo, estado: estado || 'pendiente' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 router.put('/:id', (req, res) => {
   const { pedido_id, metodo, estado } = req.body;
-
-  if (!pedido_id || !metodo || !estado)
-    return res.status(400).json({ error: 'Los campos pedido_id, metodo y estado son obligatorios' });
-  if (isNaN(pedido_id))
-    return res.status(400).json({ error: 'El pedido_id debe ser un número válido' });
-
+  if (!pedido_id || !metodo || !estado) return res.status(400).json({ error: 'Los campos pedido_id, metodo y estado son obligatorios' });
+  if (isNaN(pedido_id)) return res.status(400).json({ error: 'El pedido_id debe ser un número válido' });
   const metodosValidos = ['tarjeta', 'transferencia', 'efectivo'];
-  if (!metodosValidos.includes(metodo))
-    return res.status(400).json({ error: `El metodo debe ser uno de: ${metodosValidos.join(', ')}` });
-
+  if (!metodosValidos.includes(metodo)) return res.status(400).json({ error: `El metodo debe ser uno de: ${metodosValidos.join(', ')}` });
   const estadosValidos = ['pendiente', 'aprobado', 'fallido'];
-  if (!estadosValidos.includes(estado))
-    return res.status(400).json({ error: `El estado debe ser uno de: ${estadosValidos.join(', ')}` });
-
-  db.get('SELECT id FROM pagos WHERE id = ?', [req.params.id], (err, existe) => {
-    if (err) return res.status(500).json({ error: err.message });
+  if (!estadosValidos.includes(estado)) return res.status(400).json({ error: `El estado debe ser uno de: ${estadosValidos.join(', ')}` });
+  try {
+    const existe = db.prepare('SELECT id FROM pagos WHERE id = ?').get(req.params.id);
     if (!existe) return res.status(404).json({ error: 'Pago no encontrado' });
-
-    db.get('SELECT id FROM pedidos WHERE id = ?', [pedido_id], (err, pedido) => {
-      if (err) return res.status(500).json({ error: err.message });
-      if (!pedido) return res.status(400).json({ error: `No existe un pedido con id ${pedido_id}` });
-
-      db.run('UPDATE pagos SET pedido_id = ?, metodo = ?, estado = ? WHERE id = ?',
-        [pedido_id, metodo, estado, req.params.id], function(err) {
-          if (err) return res.status(500).json({ error: err.message });
-          res.json({ actualizado: this.changes > 0 });
-        });
-    });
-  });
+    const pedido = db.prepare('SELECT id FROM pedidos WHERE id = ?').get(pedido_id);
+    if (!pedido) return res.status(400).json({ error: `No existe un pedido con id ${pedido_id}` });
+    const result = db.prepare('UPDATE pagos SET pedido_id = ?, metodo = ?, estado = ? WHERE id = ?')
+      .run(pedido_id, metodo, estado, req.params.id);
+    res.json({ actualizado: result.changes > 0 });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 router.delete('/:id', (req, res) => {
-  db.run('DELETE FROM pagos WHERE id = ?', [req.params.id], function(err) {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json({ eliminado: this.changes > 0 });
-  });
+  try {
+    const result = db.prepare('DELETE FROM pagos WHERE id = ?').run(req.params.id);
+    res.json({ eliminado: result.changes > 0 });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-module.exports = router; //pagos
+module.exports = router;
