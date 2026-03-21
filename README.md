@@ -94,7 +94,7 @@ password: TU_API_PASSWORD
    npm install
 
 3. Crear archivo .env con:
-   password = arrozconpollo
+ password: TU_API_PASSWORD
 
 4. Iniciar en desarrollo
    npm run dev
