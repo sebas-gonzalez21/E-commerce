@@ -8,7 +8,7 @@ https://e-commerce-uiq4.onrender.com
 
 # Autenticación
 Todas las rutas requieren el siguiente header:
-password: arrozconpollo
+password: TU_API_PASSWORD
 
 ## Modelo de datos (Diagrama ER)
 ![alt text](image.png)
