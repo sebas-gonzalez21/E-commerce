@@ -4,7 +4,7 @@
 API REST para un sistema de e-commerce desarrollada con Node.js y Express, con base de datos SQLite. Permite gestionar usuarios, categorías, productos, pedidos, detalle de pedidos, pagos y reseñas.
 
 # URL en producción
-https://e-commerce-ig02.onrender.com
+https://e-commerce-uiq4.onrender.com
 
 # Autenticación
 Todas las rutas requieren el siguiente header:
