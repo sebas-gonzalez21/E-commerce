@@ -74,7 +74,8 @@ router.put('/:id', (req, res) => {
 router.delete('/:id', (req, res) => {
   try {
     const result = db.prepare('DELETE FROM pagos WHERE id = ?').run(req.params.id);
-    res.json({ eliminado: result.changes > 0 });
+    if (result.changes === 0) return res.status(404).json({ error: 'Pago no encontrado' });
+    res.json({ eliminado: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

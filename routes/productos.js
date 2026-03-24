@@ -10,79 +10,172 @@ const productosIniciales = [
   { id: 5, nombre: 'Chaqueta Impermeable',  precio: 120000, stock: 40,  categoria_id: 2 },
   { id: 6, nombre: 'Lámpara de Escritorio', precio: 62000,  stock: 60,  categoria_id: 3 },
 ];
+
 productosIniciales.forEach(p => {
-  db.prepare(`INSERT OR IGNORE INTO productos (id, nombre, precio, stock, categoria_id) VALUES (?, ?, ?, ?, ?)`)
-    .run(p.id, p.nombre, p.precio, p.stock, p.categoria_id);
+  db.prepare(`
+    INSERT OR IGNORE INTO productos 
+    (id, nombre, precio, stock, categoria_id) 
+    VALUES (?, ?, ?, ?, ?)
+  `).run(p.id, p.nombre, p.precio, p.stock, p.categoria_id);
 });
 
+
+// 🔍 GET con filtros
 router.get('/', (req, res) => {
   const condiciones = [];
   const valores = [];
+
   Object.entries(req.query).forEach(([campo, valor]) => {
     condiciones.push(`productos.${campo} LIKE ?`);
     valores.push(`%${valor}%`);
   });
-  const where = condiciones.length > 0 ? `WHERE ${condiciones.join(' AND ')}` : '';
+
+  const where = condiciones.length > 0 
+    ? `WHERE ${condiciones.join(' AND ')}` 
+    : '';
+
   try {
-    const rows = db.prepare(`SELECT productos.*, categorias.nombre AS categoria 
-      FROM productos LEFT JOIN categorias ON productos.categoria_id = categorias.id ${where}`).all(valores);
+    const rows = db.prepare(`
+      SELECT productos.*, categorias.nombre AS categoria 
+      FROM productos 
+      LEFT JOIN categorias ON productos.categoria_id = categorias.id 
+      ${where}
+    `).all(valores);
+
     res.json(rows);
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
+
+// 🔍 GET por ID
 router.get('/:id', (req, res) => {
   try {
-    const row = db.prepare(`SELECT productos.*, categorias.nombre AS categoria 
-      FROM productos LEFT JOIN categorias ON productos.categoria_id = categorias.id
-      WHERE productos.id = ?`).get(req.params.id);
-    if (!row) return res.status(404).json({ error: 'No encontrado' });
+    const row = db.prepare(`
+      SELECT productos.*, categorias.nombre AS categoria 
+      FROM productos 
+      LEFT JOIN categorias ON productos.categoria_id = categorias.id
+      WHERE productos.id = ?
+    `).get(req.params.id);
+
+    if (!row) {
+      return res.status(404).json({ error: 'Producto no encontrado' });
+    }
+
     res.json(row);
-  } catch (err) { res.status(500).json({ error: err.message }); }
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
+
+// ➕ POST
 router.post('/', (req, res) => {
   const { nombre, precio, stock, categoria_id } = req.body;
-  if (!nombre || precio === undefined || stock === undefined || !categoria_id)
-    return res.status(400).json({ error: 'Los campos nombre, precio, stock y categoria_id son obligatorios' });
-  if (typeof nombre !== 'string' || nombre.trim() === '')
-    return res.status(400).json({ error: 'El nombre debe ser un texto válido' });
-  if (isNaN(precio) || precio < 0)
-    return res.status(400).json({ error: 'El precio debe ser un número válido mayor o igual a 0' });
-  if (isNaN(stock) || stock < 0)
-    return res.status(400).json({ error: 'El stock debe ser un número válido mayor o igual a 0' });
+
+  if (!nombre || precio === undefined || stock === undefined || !categoria_id) {
+    return res.status(400).json({ 
+      error: 'Los campos nombre, precio, stock y categoria_id son obligatorios' 
+    });
+  }
+
+  if (typeof nombre !== 'string' || nombre.trim() === '') {
+    return res.status(400).json({ error: 'El nombre debe ser válido' });
+  }
+
+  if (isNaN(precio) || precio < 0) {
+    return res.status(400).json({ error: 'El precio debe ser válido' });
+  }
+
+  if (isNaN(stock) || stock < 0) {
+    return res.status(400).json({ error: 'El stock debe ser válido' });
+  }
+
   try {
-    const existe = db.prepare('SELECT id FROM categorias WHERE id = ?').get(categoria_id);
-    if (!existe) return res.status(400).json({ error: `No existe una categoría con id ${categoria_id}` });
-    const result = db.prepare('INSERT INTO productos (nombre, precio, stock, categoria_id) VALUES (?, ?, ?, ?)')
-      .run(nombre.trim(), precio, stock, categoria_id);
-    res.status(201).json({ id: result.lastInsertRowid, nombre, precio, stock, categoria_id });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+    const existeCategoria = db.prepare(`
+      SELECT id FROM categorias WHERE id = ?
+    `).get(categoria_id);
+
+    if (!existeCategoria) {
+      return res.status(400).json({ 
+        error: `No existe una categoría con id ${categoria_id}` 
+      });
+    }
+
+    const result = db.prepare(`
+      INSERT INTO productos (nombre, precio, stock, categoria_id) 
+      VALUES (?, ?, ?, ?)
+    `).run(nombre.trim(), precio, stock, categoria_id);
+
+    res.status(201).json({
+      id: result.lastInsertRowid,
+      nombre,
+      precio,
+      stock,
+      categoria_id
+    });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
+
+// ✏️ PUT (ahora con 404 automático si no existe)
 router.put('/:id', (req, res) => {
   const { nombre, precio, stock, categoria_id } = req.body;
-  if (!nombre || precio === undefined || stock === undefined || !categoria_id)
-    return res.status(400).json({ error: 'Los campos nombre, precio, stock y categoria_id son obligatorios' });
-  if (isNaN(precio) || precio < 0)
-    return res.status(400).json({ error: 'El precio debe ser un número válido mayor o igual a 0' });
-  if (isNaN(stock) || stock < 0)
-    return res.status(400).json({ error: 'El stock debe ser un número válido mayor o igual a 0' });
+
+  if (!nombre || precio === undefined || stock === undefined || !categoria_id) {
+    return res.status(400).json({ 
+      error: 'Los campos nombre, precio, stock y categoria_id son obligatorios' 
+    });
+  }
+
+  if (isNaN(precio) || precio < 0) {
+    return res.status(400).json({ error: 'El precio debe ser válido' });
+  }
+
+  if (isNaN(stock) || stock < 0) {
+    return res.status(400).json({ error: 'El stock debe ser válido' });
+  }
+
   try {
-    const existe = db.prepare('SELECT id FROM productos WHERE id = ?').get(req.params.id);
-    if (!existe) return res.status(404).json({ error: 'Producto no encontrado' });
-    const cat = db.prepare('SELECT id FROM categorias WHERE id = ?').get(categoria_id);
-    if (!cat) return res.status(400).json({ error: `No existe una categoría con id ${categoria_id}` });
-    const result = db.prepare('UPDATE productos SET nombre = ?, precio = ?, stock = ?, categoria_id = ? WHERE id = ?')
-      .run(nombre.trim(), precio, stock, categoria_id, req.params.id);
-    res.json({ actualizado: result.changes > 0 });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+    const result = db.prepare(`
+      UPDATE productos 
+      SET nombre = ?, precio = ?, stock = ?, categoria_id = ? 
+      WHERE id = ?
+    `).run(nombre.trim(), precio, stock, categoria_id, req.params.id);
+
+    if (result.changes === 0) {
+      return res.status(404).json({ error: 'Producto no encontrado' });
+    }
+
+    res.json({ actualizado: true });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
+
 
 router.delete('/:id', (req, res) => {
   try {
-    const result = db.prepare('DELETE FROM productos WHERE id = ?').run(req.params.id);
-    res.json({ eliminado: result.changes > 0 });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+    const result = db.prepare(`
+      DELETE FROM productos WHERE id = ?
+    `).run(req.params.id);
+
+    if (result.changes === 0) {
+      return res.status(404).json({ error: 'Producto no encontrado' });
+    }
+
+    res.json({ eliminado: true });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
+
 
 module.exports = router;
